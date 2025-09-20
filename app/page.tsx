@@ -44,7 +44,7 @@ const pointsOfInterest: PointOfInterest[] = [
 	},
 ];
 
-const TRIGGER_RADIUS = 50; // 30 meters
+const TRIGGER_RADIUS = 50; // Distance in meters to trigger a point of interest
 
 // --- Helper Function: Haversine Formula for Distance Calculation ---
 function getDistance(
@@ -67,7 +67,7 @@ function getDistance(
 	return R * c; // Distance in meters
 }
 
-// --- Custom Hook to dynamically load scripts ---
+// --- Custom Hook to dynamically load external scripts ---
 const useScript = (url: string) => {
 	const [isLoaded, setIsLoaded] = useState(false);
 	useEffect(() => {
@@ -76,6 +76,8 @@ const useScript = (url: string) => {
 		script.async = true;
 		script.onload = () => setIsLoaded(true);
 		document.body.appendChild(script);
+
+		// Clean up by removing the script when the component unmounts
 		return () => {
 			document.body.removeChild(script);
 		};
@@ -83,11 +85,9 @@ const useScript = (url: string) => {
 	return isLoaded;
 };
 
+// --- AR Component using imperative DOM injection ---
 const ARComponent = ({ onClose }: { onClose: () => void }) => {
-	// Create a ref for a standard div element, which will be our container
 	const sceneContainerRef = useRef<HTMLDivElement>(null);
-
-	// Your custom hook to load scripts remains the same
 	const isAFrameLoaded = useScript(
 		"https://aframe.io/releases/1.5.0/aframe.min.js"
 	);
@@ -95,13 +95,9 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
 		"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"
 	);
 
-	// This useEffect hook will run when the scripts are loaded
 	useEffect(() => {
-		// We only proceed if both scripts are loaded and our container div exists
 		if (isAFrameLoaded && isMindARLoaded && sceneContainerRef.current) {
 			const container = sceneContainerRef.current;
-
-			// Define the entire A-Frame scene as a single HTML string
 			const sceneHTML = `
         <a-scene
           mindar-image="imageTargetSrc: /targets.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
@@ -120,17 +116,13 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
           </a-entity>
         </a-scene>
       `;
-
-			// Use innerHTML to inject the A-Frame scene into our container div
 			container.innerHTML = sceneHTML;
 
-			// Cleanup function: This will run when the component is unmounted
 			return () => {
-				// Clear the container to ensure a clean removal of the scene
 				container.innerHTML = "";
 			};
 		}
-	}, [isAFrameLoaded, isMindARLoaded]); // This effect depends on the scripts loading
+	}, [isAFrameLoaded, isMindARLoaded]);
 
 	return (
 		<div className="fixed top-0 left-0 w-full h-full z-50">
@@ -141,14 +133,8 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
 				Close AR
 			</button>
 
-			{/* This is our container div. A-Frame will be injected inside it.
-        The ref connects this div to our sceneContainerRef in the code.
-      */}
 			<div ref={sceneContainerRef} className="w-full h-full" />
 
-			{/* This is a loading overlay that shows while the AR scripts are downloading.
-        It is positioned absolutely to appear on top of the empty container.
-      */}
 			{(!isAFrameLoaded || !isMindARLoaded) && (
 				<div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-75">
 					<p className="text-white text-lg">
@@ -159,8 +145,10 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
 		</div>
 	);
 };
+
 // --- Main Page Component ---
 export default function Home() {
+	// State management for the application
 	const [locations, setLocations] = useState<LocationState[]>(
 		pointsOfInterest.map((p) => ({
 			...p,
@@ -178,6 +166,8 @@ export default function Home() {
 	const [isWatching, setIsWatching] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showAR, setShowAR] = useState(false);
+
+	// Refs for DOM elements and watch ID
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const watchIdRef = useRef<number | null>(null);
 
@@ -214,13 +204,6 @@ export default function Home() {
 						setStatusMessage(`Playing story for: ${point.name}`);
 						didTriggerAudio = true;
 
-						// ✨ **NEW CODE ADDED HERE** ✨
-						// If the visited point is the one with the AR experience,
-						// set the state to show the AR component automatically.
-						if (point.id === 1) {
-							setShowAR(true);
-						}
-
 						return { ...point, played: true, distance };
 					}
 
@@ -250,45 +233,37 @@ export default function Home() {
 		[] // Dependencies remain empty
 	);
 
+	// Effect to handle playing audio when a new track is activated
 	useEffect(() => {
 		if (activeAudio && audioRef.current) {
 			audioRef.current.src = activeAudio;
-			audioRef.current.muted = false;
 			const playPromise = audioRef.current.play();
-
 			if (playPromise !== undefined) {
-				playPromise.catch((error) => {
-					console.error(
-						"Audio autoplay was blocked by the browser.",
-						error
-					);
+				playPromise.catch((err) => {
+					console.error("Audio autoplay was blocked:", err);
 					setError(
-						"Your browser blocked autoplay. Please press the play button on the audio player below."
+						"Your browser blocked autoplay. Please press play on the audio player."
 					);
-					const lastTriggeredPoint = pointsOfInterest.find(
-						(p) => p.audioSrc === activeAudio
-					);
-					if (lastTriggeredPoint) {
-						setStatusMessage(
-							`Audio ready for: ${lastTriggeredPoint.name}. Press play.`
-						);
-					}
 				});
 			}
 		}
 	}, [activeAudio]);
 
+	// Function to start the location tracking
 	const handleStartTour = () => {
 		if (!navigator.geolocation) {
 			setError("Geolocation is not supported by your browser.");
 			return;
 		}
 
+		// A common trick to "unlock" audio on mobile browsers requires a user interaction
 		if (audioRef.current) {
 			audioRef.current.muted = true;
 			audioRef.current.play().catch(() => {});
+			audioRef.current.muted = false;
 		}
 
+		// Get initial position and then start watching for changes
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
 				setIsWatching(true);
@@ -310,6 +285,7 @@ export default function Home() {
 		);
 	};
 
+	// Cleanup effect to stop watching the user's location when the component unmounts
 	useEffect(() => {
 		return () => {
 			if (watchIdRef.current !== null) {
@@ -318,10 +294,13 @@ export default function Home() {
 		};
 	}, []);
 
+	// JSX for rendering the component
 	return (
 		<div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
+			{/* Conditionally render the AR component when showAR is true */}
 			{showAR && <ARComponent onClose={() => setShowAR(false)} />}
 
+			{/* Main UI is hidden when the AR view is active */}
 			<div
 				className={`w-full max-w-md mx-auto ${showAR ? "hidden" : ""}`}
 			>
@@ -336,14 +315,12 @@ export default function Home() {
 
 				<main className="bg-gray-800 rounded-lg shadow-lg p-6">
 					{!isWatching ? (
-						<>
-							<button
-								onClick={handleStartTour}
-								className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105"
-							>
-								Start Tour
-							</button>
-						</>
+						<button
+							onClick={handleStartTour}
+							className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105"
+						>
+							Start Tour
+						</button>
 					) : (
 						<div className="text-center">
 							<div className="bg-gray-700 p-4 rounded-lg">
@@ -380,7 +357,9 @@ export default function Home() {
 									<p className="text-xs mt-2 text-teal-400">
 										{point.distance === Infinity
 											? `Distance: Not Available`
-											: `Distance: ${Math.round(point.distance)}m` }
+											: `Distance: ${Math.round(
+													point.distance
+											  )}m`}
 										{point.played && (
 											<span className="ml-2 font-bold text-green-400">
 												(Visited ✔)
@@ -388,6 +367,15 @@ export default function Home() {
 										)}
 									</p>
 
+									{/* Conditionally render the button to launch the AR experience */}
+									{point.id === 1 && point.played && (
+										<button
+											onClick={() => setShowAR(true)}
+											className="mt-3 w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-transform transform hover:scale-105"
+										>
+											Launch AR Experience
+										</button>
+									)}
 								</li>
 							))}
 						</ul>
