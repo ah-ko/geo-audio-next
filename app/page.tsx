@@ -30,7 +30,7 @@ const pointsOfInterest: PointOfInterest[] = [
     name: "The Old Adams Cabin Site",
     lat: 46.0997975,
     lon: -77.4900301,
-    audioSrc: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+    audioSrc: "/oldcabin.m4a", 
     description: "This is where the story of the family cabin unfolds. Listen to memories of growing up by the water."
   },
   {
@@ -38,7 +38,7 @@ const pointsOfInterest: PointOfInterest[] = [
     name: "Approx. Wylie Road Schoolhouse Location",
     lat: 46.0905,
     lon: -77.5112,
-    audioSrc: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+    audioSrc: "/oldcabin.m4a", 
     description: "Imagine the long walk to the one-room schoolhouse. This audio clip shares what school was like in the 1940s."
   },
 ];
@@ -73,6 +73,7 @@ export default function Home() {
   const [isWatching, setIsWatching] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   const processLocationUpdate = useCallback((position: GeolocationPosition) => {
     const { latitude, longitude } = position.coords;
@@ -90,6 +91,7 @@ export default function Home() {
             }
 
             if (distance <= TRIGGER_RADIUS && !point.played) {
+                setError(null); // Clear previous errors on new trigger
                 setActiveAudio(point.audioSrc);
                 setStatusMessage(`Playing story for: ${point.name}`);
                 didTriggerAudio = true;
@@ -114,9 +116,21 @@ export default function Home() {
   useEffect(() => {
     if (activeAudio && audioRef.current) {
       audioRef.current.src = activeAudio;
-      audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
+      audioRef.current.muted = false; // Ensure audio is unmuted for playback
+      const playPromise = audioRef.current.play();
+
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Audio autoplay was blocked by the browser.", error);
+          setError("Your browser blocked autoplay. Please press the play button on the audio player below.");
+          const lastTriggeredPoint = locations.find(p => p.audioSrc === activeAudio);
+          if (lastTriggeredPoint) {
+            setStatusMessage(`Audio ready for: ${lastTriggeredPoint.name}. Press play.`);
+          }
+        });
+      }
     }
-  }, [activeAudio]);
+  }, [activeAudio, locations]);
 
   const handleStartTour = () => {
     if (!navigator.geolocation) {
@@ -124,8 +138,14 @@ export default function Home() {
       return;
     }
 
-    // A reference to the watchId
-    let watchId: number | null = null;
+    // --- KEY FIX: Unlock audio on first user interaction ---
+    if (audioRef.current) {
+        audioRef.current.muted = true;
+        audioRef.current.play().catch(() => {
+            // This is expected to fail silently if there's no source,
+            // but the user gesture "unlocks" the ability to play audio later.
+        });
+    }
     
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -134,7 +154,7 @@ export default function Home() {
         setStatusMessage("Location activated. Walking tour started.");
         processLocationUpdate(position);
 
-        watchId = navigator.geolocation.watchPosition(
+        watchIdRef.current = navigator.geolocation.watchPosition(
           processLocationUpdate,
           (err) => setError(`Location Error: ${err.message}`),
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -144,14 +164,16 @@ export default function Home() {
         setError(`Permission Denied: ${err.message}. Please enable location services.`);
       }
     );
-
-    // This cleanup function will be available if you need to stop watching
-    return () => {
-        if(watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-        }
-    };
   };
+
+  // Cleanup effect to stop watching location when the component unmounts
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
   
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
@@ -163,12 +185,17 @@ export default function Home() {
 
         <main className="bg-gray-800 rounded-lg shadow-lg p-6">
           {!isWatching ? (
-            <button
-              onClick={handleStartTour}
-              className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105"
-            >
-              Start Tour
-            </button>
+            <>
+              <button
+                onClick={handleStartTour}
+                className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105"
+              >
+                Start Tour
+              </button>
+              <p className="text-xs text-gray-500 mt-3 text-center">
+                Note: Most browsers require this initial tap to enable automatic audio playback on location.
+              </p>
+            </>
           ) : (
             <div className="text-center">
               <div className="bg-gray-700 p-4 rounded-lg">
@@ -207,3 +234,4 @@ export default function Home() {
     </div>
   );
 }
+
