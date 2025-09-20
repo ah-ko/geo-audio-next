@@ -42,6 +42,15 @@ const pointsOfInterest: PointOfInterest[] = [
     description:
       "Imagine the long walk to the one-room schoolhouse. This audio clip shares what school was like in the 1940s.",
   },
+    {
+    id: 3,
+    name: "Approx. 69 Lange Rd",
+    lat: 46.1581327,
+    lon: -77.632293,
+    audioSrc: "/oldcabin.m4a",
+    description:
+      "69 Lange Rd",
+  },
 ];
 
 const TRIGGER_RADIUS = 30; // Distance in meters to trigger a point of interest
