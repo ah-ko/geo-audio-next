@@ -2,6 +2,20 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+// --- A-Frame JSX Type Declarations ---
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'a-scene': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'a-assets': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'a-camera': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'a-entity': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'a-plane': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      // Add more A-Frame elements as needed
+    }
+  }
+}
+
 // --- Type Definitions for TypeScript ---
 interface PointOfInterest {
   id: number;
