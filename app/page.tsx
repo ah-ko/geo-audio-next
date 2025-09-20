@@ -113,6 +113,9 @@ export default function Home() {
     });
   }, []);
 
+  // --- MAJOR FIX for autoplay loop ---
+  // This effect now ONLY runs when `activeAudio` changes.
+  // It no longer depends on `locations`, which was causing it to re-trigger on every distance update.
   useEffect(() => {
     if (activeAudio && audioRef.current) {
       audioRef.current.src = activeAudio;
@@ -123,14 +126,15 @@ export default function Home() {
         playPromise.catch(error => {
           console.error("Audio autoplay was blocked by the browser.", error);
           setError("Your browser blocked autoplay. Please press the play button on the audio player below.");
-          const lastTriggeredPoint = locations.find(p => p.audioSrc === activeAudio);
+          // Find the name of the point that was just triggered to provide a helpful message.
+          const lastTriggeredPoint = pointsOfInterest.find(p => p.audioSrc === activeAudio);
           if (lastTriggeredPoint) {
             setStatusMessage(`Audio ready for: ${lastTriggeredPoint.name}. Press play.`);
           }
         });
       }
     }
-  }, [activeAudio, locations]);
+  }, [activeAudio]);
 
   const handleStartTour = () => {
     if (!navigator.geolocation) {
@@ -234,4 +238,3 @@ export default function Home() {
     </div>
   );
 }
-
