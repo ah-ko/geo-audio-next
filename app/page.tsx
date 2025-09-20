@@ -28,17 +28,18 @@ const pointsOfInterest: PointOfInterest[] = [
   {
     id: 1,
     name: "The Old Adams Cabin Site",
-    lat: 46.0997975,
-    lon: -77.4900301,
-    audioSrc: "/oldcabin.m4a", 
+    lat: 46.106953,
+    lon: -77.489467,
+
+    audioSrc: "/oldcabin.m4a",
     description: "This is where the story of the family cabin unfolds. Listen to memories of growing up by the water."
   },
   {
     id: 2,
     name: "Approx. Wylie Road Schoolhouse Location",
-    lat: 46.0905,
-    lon: -77.5112,
-    audioSrc: "/oldcabin.m4a", 
+    lat: 46.0997975,
+    lon: -77.4900301,
+    audioSrc: "/oldcabin.m4a",
     description: "Imagine the long walk to the one-room schoolhouse. This audio clip shares what school was like in the 1940s."
   },
 ];
@@ -54,8 +55,8 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const Δλ = (lon2 - lon1) * Math.PI / 180;
 
   const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
@@ -83,33 +84,33 @@ export default function Home() {
     let didTriggerAudio = false;
 
     setLocations(prevLocations => {
-        const updatedLocations = prevLocations.map(point => {
-            const distance = getDistance(latitude, longitude, point.lat, point.lon);
+      const updatedLocations = prevLocations.map(point => {
+        const distance = getDistance(latitude, longitude, point.lat, point.lon);
 
-            if (distance < (nearestPoint as { distance: number }).distance) {
-                nearestPoint = { ...point, distance };
-            }
-
-            if (distance <= TRIGGER_RADIUS && !point.played) {
-                setError(null); // Clear previous errors on new trigger
-                setActiveAudio(point.audioSrc);
-                setStatusMessage(`Playing story for: ${point.name}`);
-                didTriggerAudio = true;
-                return { ...point, played: true, distance };
-            }
-
-            return { ...point, distance };
-        });
-
-        if (!didTriggerAudio) {
-            if ((nearestPoint as { distance: number }).distance === Infinity) {
-                setStatusMessage("Searching for points of interest...");
-            } else {
-                setStatusMessage(`Walk towards ${(nearestPoint as LocationState).name} (${Math.round((nearestPoint as { distance: number }).distance)}m away)`);
-            }
+        if (distance < (nearestPoint as { distance: number }).distance) {
+          nearestPoint = { ...point, distance };
         }
-        
-        return updatedLocations;
+
+        if (distance <= TRIGGER_RADIUS && !point.played) {
+          setError(null); // Clear previous errors on new trigger
+          setActiveAudio(point.audioSrc);
+          setStatusMessage(`Playing story for: ${point.name}`);
+          didTriggerAudio = true;
+          return { ...point, played: true, distance };
+        }
+
+        return { ...point, distance };
+      });
+
+      if (!didTriggerAudio) {
+        if ((nearestPoint as { distance: number }).distance === Infinity) {
+          setStatusMessage("Searching for points of interest...");
+        } else {
+          setStatusMessage(`Walk towards ${(nearestPoint as LocationState).name} (${Math.round((nearestPoint as { distance: number }).distance)}m away)`);
+        }
+      }
+
+      return updatedLocations;
     });
   }, []);
 
@@ -144,13 +145,13 @@ export default function Home() {
 
     // --- KEY FIX: Unlock audio on first user interaction ---
     if (audioRef.current) {
-        audioRef.current.muted = true;
-        audioRef.current.play().catch(() => {
-            // This is expected to fail silently if there's no source,
-            // but the user gesture "unlocks" the ability to play audio later.
-        });
+      audioRef.current.muted = true;
+      audioRef.current.play().catch(() => {
+        // This is expected to fail silently if there's no source,
+        // but the user gesture "unlocks" the ability to play audio later.
+      });
     }
-    
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setIsWatching(true);
@@ -178,7 +179,7 @@ export default function Home() {
       }
     };
   }, []);
-  
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
       <div className="w-full max-w-md mx-auto">
@@ -229,10 +230,10 @@ export default function Home() {
 
           <audio ref={audioRef} controls className="w-full mt-6" />
         </main>
-        
+
         <footer className="text-center text-gray-500 text-xs mt-8">
-            <p>Built for the Deep River History Project.</p>
-            <p>Ensure your device's location services are enabled for the best experience.</p>
+          <p>Built for the Deep River History Project.</p>
+          <p>Ensure your device's location services are enabled for the best experience.</p>
         </footer>
       </div>
     </div>
