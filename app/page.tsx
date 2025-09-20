@@ -44,7 +44,7 @@ const pointsOfInterest: PointOfInterest[] = [
   },
 ];
 
-const TRIGGER_RADIUS = 50; // Distance in meters to trigger a point of interest
+const TRIGGER_RADIUS = 30; // Distance in meters to trigger a point of interest
 
 // --- Helper Function: Haversine Formula for Distance Calculation ---
 function getDistance(
