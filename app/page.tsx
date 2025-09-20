@@ -107,7 +107,7 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
       {isAFrameLoaded && isMindARLoaded ? (
         <a-scene
           ref={sceneRef}
-          mindar-image="imageTargetSrc: /target.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
+          mindar-image="imageTargetSrc: /targets.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
           color-space="sRGB"
           renderer="colorManagement: true, physicallyCorrectLights"
           vr-mode-ui="enabled: false"
