@@ -112,7 +112,7 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
           </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
           <a-entity mindar-image-target="targetIndex: 0">
-            <a-plane src="#familyPhoto" position="0 0 0" height="1" width="1.5" rotation="0 0 0"></a-plane>
+             <a-plane material="src: #familyPhoto; transparent: true" position="0 0 0" height="1" width="1.5" rotation="0 0 0"></a-plane>
           </a-entity>
         </a-scene>
       `;
