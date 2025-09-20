@@ -110,9 +110,7 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
         <a-scene
           mindar-image="imageTargetSrc: /targets.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
           color-space="sRGB"
-          
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
-
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false"
           embedded
@@ -123,7 +121,14 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
           <a-entity mindar-image-target="targetIndex: 0">
              
-             <a-plane material="src: #familyPhoto; transparent: true; shader: flat; alphaTest: 0.5;" position="0 0 0" height="1" width="1.5" rotation="0 0 0"></a-plane>
+             <a-plane 
+                material="src: #familyPhoto; transparent: true; shader: flat; alphaTest: 0.5;" 
+                position="0.25 -0.25 0" 
+                scale="0.5 0.5 0.5"
+                height="1" 
+                width="1.5" 
+                rotation="0 0 0">
+             </a-plane>
 
           </a-entity>
         </a-scene>
@@ -157,7 +162,6 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
     </div>
   );
 };
-
 // --- Main Page Component ---
 export default function Home() {
   // State management for the application
