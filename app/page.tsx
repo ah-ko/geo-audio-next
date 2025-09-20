@@ -1,103 +1,209 @@
-import Image from "next/image";
+"use client"; // This is essential for Next.js to run this component in the browser
 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+// --- Type Definitions for TypeScript ---
+interface PointOfInterest {
+  id: number;
+  name: string;
+  lat: number;
+  lon: number;
+  audioSrc: string;
+  description: string;
+}
+
+interface LocationState extends PointOfInterest {
+  played: boolean;
+  distance: number;
+}
+
+interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
+
+// --- Configuration ---
+const pointsOfInterest: PointOfInterest[] = [
+  {
+    id: 1,
+    name: "The Old Adams Cabin Site",
+    lat: 46.0997975,
+    lon: -77.4900301,
+    audioSrc: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+    description: "This is where the story of the family cabin unfolds. Listen to memories of growing up by the water."
+  },
+  {
+    id: 2,
+    name: "Approx. Wylie Road Schoolhouse Location",
+    lat: 46.0905,
+    lon: -77.5112,
+    audioSrc: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+    description: "Imagine the long walk to the one-room schoolhouse. This audio clip shares what school was like in the 1940s."
+  },
+];
+
+const TRIGGER_RADIUS = 30; // 30 meters
+
+// --- Helper Function: Haversine Formula for Distance Calculation ---
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
+
+// --- Main Page Component ---
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [locations, setLocations] = useState<LocationState[]>(
+    pointsOfInterest.map(p => ({ ...p, played: false, distance: Infinity }))
+  );
+  const [currentPosition, setCurrentPosition] = useState<Coordinates | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>("Click 'Start Tour' to begin.");
+  const [activeAudio, setActiveAudio] = useState<string | null>(null);
+  const [isWatching, setIsWatching] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  const processLocationUpdate = useCallback((position: GeolocationPosition) => {
+    const { latitude, longitude } = position.coords;
+    setCurrentPosition({ latitude, longitude });
+
+    let nearestPoint: LocationState | { distance: number } = { distance: Infinity };
+    let didTriggerAudio = false;
+
+    setLocations(prevLocations => {
+        const updatedLocations = prevLocations.map(point => {
+            const distance = getDistance(latitude, longitude, point.lat, point.lon);
+
+            if (distance < (nearestPoint as { distance: number }).distance) {
+                nearestPoint = { ...point, distance };
+            }
+
+            if (distance <= TRIGGER_RADIUS && !point.played) {
+                setActiveAudio(point.audioSrc);
+                setStatusMessage(`Playing story for: ${point.name}`);
+                didTriggerAudio = true;
+                return { ...point, played: true, distance };
+            }
+
+            return { ...point, distance };
+        });
+
+        if (!didTriggerAudio) {
+            if ((nearestPoint as { distance: number }).distance === Infinity) {
+                setStatusMessage("Searching for points of interest...");
+            } else {
+                setStatusMessage(`Walk towards ${(nearestPoint as LocationState).name} (${Math.round((nearestPoint as { distance: number }).distance)}m away)`);
+            }
+        }
+        
+        return updatedLocations;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (activeAudio && audioRef.current) {
+      audioRef.current.src = activeAudio;
+      audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
+    }
+  }, [activeAudio]);
+
+  const handleStartTour = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    // A reference to the watchId
+    let watchId: number | null = null;
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsWatching(true);
+        setError(null);
+        setStatusMessage("Location activated. Walking tour started.");
+        processLocationUpdate(position);
+
+        watchId = navigator.geolocation.watchPosition(
+          processLocationUpdate,
+          (err) => setError(`Location Error: ${err.message}`),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      },
+      (err) => {
+        setError(`Permission Denied: ${err.message}. Please enable location services.`);
+      }
+    );
+
+    // This cleanup function will be available if you need to stop watching
+    return () => {
+        if(watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+        }
+    };
+  };
+  
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
+      <div className="w-full max-w-md mx-auto">
+        <header className="text-center mb-6">
+          <h1 className="text-4xl font-bold text-teal-400">Deep River Audio Tour</h1>
+          <p className="text-gray-400 mt-2">A Location-Aware Historical Experience</p>
+        </header>
+
+        <main className="bg-gray-800 rounded-lg shadow-lg p-6">
+          {!isWatching ? (
+            <button
+              onClick={handleStartTour}
+              className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105"
+            >
+              Start Tour
+            </button>
+          ) : (
+            <div className="text-center">
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <p className="font-semibold text-lg">Status:</p>
+                <p className="text-teal-300 text-md min-h-[48px] flex items-center justify-center">{statusMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-red-400 mt-4 text-center">{error}</p>}
+
+          <div className="mt-6">
+            <h2 className="text-xl font-semibold border-b-2 border-gray-600 pb-2 mb-4">Points of Interest</h2>
+            <ul className="space-y-4">
+              {locations.map(point => (
+                <li key={point.id} className={`p-4 rounded-lg transition-all ${point.played ? 'bg-teal-900/50' : 'bg-gray-700'}`}>
+                  <h3 className="font-bold">{point.name}</h3>
+                  <p className="text-sm text-gray-400">{point.description}</p>
+                  <p className="text-xs mt-2 text-teal-400">
+                    {point.distance === Infinity ? 'Distance: N/A' : `Distance: ${Math.round(point.distance)}m`}
+                    {point.played && <span className="ml-2 font-bold text-green-400">(Visited ✔)</span>}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <audio ref={audioRef} controls className="w-full mt-6" />
+        </main>
+        
+        <footer className="text-center text-gray-500 text-xs mt-8">
+            <p>Built for the Deep River History Project.</p>
+            <p>Ensure your device's location services are enabled for the best experience.</p>
+        </footer>
+      </div>
     </div>
   );
 }
