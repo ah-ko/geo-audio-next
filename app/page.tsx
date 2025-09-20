@@ -22,7 +22,6 @@ interface Coordinates {
   longitude: number;
 }
 
-
 // --- Configuration ---
 const pointsOfInterest: PointOfInterest[] = [
   {
@@ -55,12 +54,82 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const Δλ = (lon2 - lon1) * Math.PI / 180;
 
   const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
 }
+
+// --- Custom Hook to dynamically load scripts ---
+const useScript = (url: string) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    script.onload = () => setIsLoaded(true);
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [url]);
+  return isLoaded;
+};
+
+
+// --- NEW AR COMPONENT ---
+const ARComponent = ({ onClose }: { onClose: () => void }) => {
+  const sceneRef = useRef<any>(null);
+  // Load scripts and only render the scene when they are ready
+  const isAFrameLoaded = useScript("https://aframe.io/releases/1.5.0/aframe.min.js");
+  const isMindARLoaded = useScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js");
+
+  useEffect(() => {
+    if (isAFrameLoaded && isMindARLoaded) {
+      const sceneEl = sceneRef.current;
+      if (sceneEl) {
+        sceneEl.addEventListener('arReady', () => console.log("MindAR is ready"));
+        sceneEl.addEventListener('arError', (error: any) => console.error("MindAR error:", error));
+      }
+    }
+  }, [isAFrameLoaded, isMindARLoaded]);
+  
+  return (
+    <div className="fixed top-0 left-0 w-full h-full z-50">
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 bg-black bg-opacity-50 text-white font-bold py-2 px-4 rounded-lg z-50"
+      >
+        Close AR
+      </button>
+      
+      {isAFrameLoaded && isMindARLoaded ? (
+        <a-scene
+          ref={sceneRef}
+          mindar-image="imageTargetSrc: /target.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
+          color-space="sRGB"
+          renderer="colorManagement: true, physicallyCorrectLights"
+          vr-mode-ui="enabled: false"
+          device-orientation-permission-ui="enabled: false"
+          embedded
+        >
+          <a-assets>
+            <img id="familyPhoto" src="/family-photo.png" alt="Family historical photograph" />
+          </a-assets>
+          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          <a-entity mindar-image-target="targetIndex: 0">
+            <a-plane src="#familyPhoto" position="0 0 0" height="1" width="1.5" rotation="0 0 0"></a-plane>
+          </a-entity>
+        </a-scene>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <p>Loading AR Libraries...</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 // --- Main Page Component ---
@@ -73,6 +142,7 @@ export default function Home() {
   const [activeAudio, setActiveAudio] = useState<string | null>(null);
   const [isWatching, setIsWatching] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAR, setShowAR] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
@@ -84,50 +154,46 @@ export default function Home() {
     let didTriggerAudio = false;
 
     setLocations(prevLocations => {
-      const updatedLocations = prevLocations.map(point => {
-        const distance = getDistance(latitude, longitude, point.lat, point.lon);
+        const updatedLocations = prevLocations.map(point => {
+            const distance = getDistance(latitude, longitude, point.lat, point.lon);
 
-        if (distance < (nearestPoint as { distance: number }).distance) {
-          nearestPoint = { ...point, distance };
+            if (distance < (nearestPoint as { distance: number }).distance) {
+                nearestPoint = { ...point, distance };
+            }
+
+            if (distance <= TRIGGER_RADIUS && !point.played) {
+                setError(null);
+                setActiveAudio(point.audioSrc);
+                setStatusMessage(`Playing story for: ${point.name}`);
+                didTriggerAudio = true;
+                return { ...point, played: true, distance };
+            }
+
+            return { ...point, distance };
+        });
+
+        if (!didTriggerAudio) {
+            if ((nearestPoint as { distance: number }).distance === Infinity) {
+                setStatusMessage("Searching for points of interest...");
+            } else {
+                setStatusMessage(`Walk towards ${(nearestPoint as LocationState).name} (${Math.round((nearestPoint as { distance: number }).distance)}m away)`);
+            }
         }
-
-        if (distance <= TRIGGER_RADIUS && !point.played) {
-          setError(null); // Clear previous errors on new trigger
-          setActiveAudio(point.audioSrc);
-          setStatusMessage(`Playing story for: ${point.name}`);
-          didTriggerAudio = true;
-          return { ...point, played: true, distance };
-        }
-
-        return { ...point, distance };
-      });
-
-      if (!didTriggerAudio) {
-        if ((nearestPoint as { distance: number }).distance === Infinity) {
-          setStatusMessage("Searching for points of interest...");
-        } else {
-          setStatusMessage(`Walk towards ${(nearestPoint as LocationState).name} (${Math.round((nearestPoint as { distance: number }).distance)}m away)`);
-        }
-      }
-
-      return updatedLocations;
+        
+        return updatedLocations;
     });
   }, []);
 
-  // --- MAJOR FIX for autoplay loop ---
-  // This effect now ONLY runs when `activeAudio` changes.
-  // It no longer depends on `locations`, which was causing it to re-trigger on every distance update.
   useEffect(() => {
     if (activeAudio && audioRef.current) {
       audioRef.current.src = activeAudio;
-      audioRef.current.muted = false; // Ensure audio is unmuted for playback
+      audioRef.current.muted = false;
       const playPromise = audioRef.current.play();
 
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.error("Audio autoplay was blocked by the browser.", error);
           setError("Your browser blocked autoplay. Please press the play button on the audio player below.");
-          // Find the name of the point that was just triggered to provide a helpful message.
           const lastTriggeredPoint = pointsOfInterest.find(p => p.audioSrc === activeAudio);
           if (lastTriggeredPoint) {
             setStatusMessage(`Audio ready for: ${lastTriggeredPoint.name}. Press play.`);
@@ -143,15 +209,11 @@ export default function Home() {
       return;
     }
 
-    // --- KEY FIX: Unlock audio on first user interaction ---
     if (audioRef.current) {
-      audioRef.current.muted = true;
-      audioRef.current.play().catch(() => {
-        // This is expected to fail silently if there's no source,
-        // but the user gesture "unlocks" the ability to play audio later.
-      });
+        audioRef.current.muted = true;
+        audioRef.current.play().catch(() => {});
     }
-
+    
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setIsWatching(true);
@@ -171,7 +233,6 @@ export default function Home() {
     );
   };
 
-  // Cleanup effect to stop watching location when the component unmounts
   useEffect(() => {
     return () => {
       if (watchIdRef.current !== null) {
@@ -179,10 +240,12 @@ export default function Home() {
       }
     };
   }, []);
-
+  
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans">
-      <div className="w-full max-w-md mx-auto">
+      {showAR && <ARComponent onClose={() => setShowAR(false)} />}
+      
+      <div className={`w-full max-w-md mx-auto ${showAR ? 'hidden' : ''}`}>
         <header className="text-center mb-6">
           <h1 className="text-4xl font-bold text-teal-400">Deep River Audio Tour</h1>
           <p className="text-gray-400 mt-2">A Location-Aware Historical Experience</p>
@@ -223,6 +286,14 @@ export default function Home() {
                     {point.distance === Infinity ? 'Distance: N/A' : `Distance: ${Math.round(point.distance)}m`}
                     {point.played && <span className="ml-2 font-bold text-green-400">(Visited ✔)</span>}
                   </p>
+                  {point.id === 1 && point.played && !showAR && (
+                    <button
+                      onClick={() => setShowAR(true)}
+                      className="mt-3 w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm"
+                    >
+                      Launch AR Experience
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -230,12 +301,13 @@ export default function Home() {
 
           <audio ref={audioRef} controls className="w-full mt-6" />
         </main>
-
+        
         <footer className="text-center text-gray-500 text-xs mt-8">
-          <p>Built for the Deep River History Project.</p>
-          <p>Ensure your device's location services are enabled for the best experience.</p>
+            <p>Built for the Deep River History Project.</p>
+            <p>Ensure your device's location services are enabled for the best experience.</p>
         </footer>
       </div>
     </div>
   );
 }
+
