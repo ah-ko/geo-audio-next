@@ -27,9 +27,8 @@ const pointsOfInterest: PointOfInterest[] = [
 	{
 		id: 1,
 		name: "The Old Adams Cabin Site",
-		lat: 46.106953,
-		lon: -77.489467,
-
+		lat: 46.0997975,
+		lon: -77.4900301,
 		audioSrc: "/oldcabin.m4a",
 		description:
 			"This is where the story of the family cabin unfolds. Listen to memories of growing up by the water.",
@@ -37,15 +36,15 @@ const pointsOfInterest: PointOfInterest[] = [
 	{
 		id: 2,
 		name: "Approx. Wylie Road Schoolhouse Location",
-		lat: 46.0997975,
-		lon: -77.4900301,
+		lat: 46.106953,
+		lon: -77.489467,
 		audioSrc: "/oldcabin.m4a",
 		description:
 			"Imagine the long walk to the one-room schoolhouse. This audio clip shares what school was like in the 1940s.",
 	},
 ];
 
-const TRIGGER_RADIUS = 30; // 30 meters
+const TRIGGER_RADIUS = 50; // 30 meters
 
 // --- Helper Function: Haversine Formula for Distance Calculation ---
 function getDistance(
@@ -85,21 +84,25 @@ const useScript = (url: string) => {
 };
 
 const ARComponent = ({ onClose }: { onClose: () => void }) => {
-  // Create a ref for a standard div element, which will be our container
-  const sceneContainerRef = useRef<HTMLDivElement>(null);
+	// Create a ref for a standard div element, which will be our container
+	const sceneContainerRef = useRef<HTMLDivElement>(null);
 
-  // Your custom hook to load scripts remains the same
-  const isAFrameLoaded = useScript("https://aframe.io/releases/1.5.0/aframe.min.js");
-  const isMindARLoaded = useScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js");
+	// Your custom hook to load scripts remains the same
+	const isAFrameLoaded = useScript(
+		"https://aframe.io/releases/1.5.0/aframe.min.js"
+	);
+	const isMindARLoaded = useScript(
+		"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"
+	);
 
-  // This useEffect hook will run when the scripts are loaded
-  useEffect(() => {
-    // We only proceed if both scripts are loaded and our container div exists
-    if (isAFrameLoaded && isMindARLoaded && sceneContainerRef.current) {
-      const container = sceneContainerRef.current;
+	// This useEffect hook will run when the scripts are loaded
+	useEffect(() => {
+		// We only proceed if both scripts are loaded and our container div exists
+		if (isAFrameLoaded && isMindARLoaded && sceneContainerRef.current) {
+			const container = sceneContainerRef.current;
 
-      // Define the entire A-Frame scene as a single HTML string
-      const sceneHTML = `
+			// Define the entire A-Frame scene as a single HTML string
+			const sceneHTML = `
         <a-scene
           mindar-image="imageTargetSrc: /targets.mind; autoStart: true; uiLoading: ar; uiScanning: ar;"
           color-space="sRGB"
@@ -118,41 +121,43 @@ const ARComponent = ({ onClose }: { onClose: () => void }) => {
         </a-scene>
       `;
 
-      // Use innerHTML to inject the A-Frame scene into our container div
-      container.innerHTML = sceneHTML;
-      
-      // Cleanup function: This will run when the component is unmounted
-      return () => {
-        // Clear the container to ensure a clean removal of the scene
-        container.innerHTML = '';
-      };
-    }
-  }, [isAFrameLoaded, isMindARLoaded]); // This effect depends on the scripts loading
+			// Use innerHTML to inject the A-Frame scene into our container div
+			container.innerHTML = sceneHTML;
 
-  return (
-    <div className="fixed top-0 left-0 w-full h-full z-50">
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 bg-black bg-opacity-50 text-white font-bold py-2 px-4 rounded-lg z-50"
-      >
-        Close AR
-      </button>
+			// Cleanup function: This will run when the component is unmounted
+			return () => {
+				// Clear the container to ensure a clean removal of the scene
+				container.innerHTML = "";
+			};
+		}
+	}, [isAFrameLoaded, isMindARLoaded]); // This effect depends on the scripts loading
 
-      {/* This is our container div. A-Frame will be injected inside it.
+	return (
+		<div className="fixed top-0 left-0 w-full h-full z-50">
+			<button
+				onClick={onClose}
+				className="absolute top-4 right-4 bg-black bg-opacity-50 text-white font-bold py-2 px-4 rounded-lg z-50"
+			>
+				Close AR
+			</button>
+
+			{/* This is our container div. A-Frame will be injected inside it.
         The ref connects this div to our sceneContainerRef in the code.
       */}
-      <div ref={sceneContainerRef} className="w-full h-full" />
-      
-      {/* This is a loading overlay that shows while the AR scripts are downloading.
+			<div ref={sceneContainerRef} className="w-full h-full" />
+
+			{/* This is a loading overlay that shows while the AR scripts are downloading.
         It is positioned absolutely to appear on top of the empty container.
       */}
-      {(!isAFrameLoaded || !isMindARLoaded) && (
-        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-75">
-          <p className="text-white text-lg">Loading AR Libraries...</p>
-        </div>
-      )}
-    </div>
-  );
+			{(!isAFrameLoaded || !isMindARLoaded) && (
+				<div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-75">
+					<p className="text-white text-lg">
+						Loading AR Libraries...
+					</p>
+				</div>
+			)}
+		</div>
+	);
 };
 // --- Main Page Component ---
 export default function Home() {
@@ -202,11 +207,20 @@ export default function Home() {
 						nearestPoint = { ...point, distance };
 					}
 
+					// This is the block that runs when a point is "visited"
 					if (distance <= TRIGGER_RADIUS && !point.played) {
 						setError(null);
 						setActiveAudio(point.audioSrc);
 						setStatusMessage(`Playing story for: ${point.name}`);
 						didTriggerAudio = true;
+
+						// ✨ **NEW CODE ADDED HERE** ✨
+						// If the visited point is the one with the AR experience,
+						// set the state to show the AR component automatically.
+						if (point.id === 1) {
+							setShowAR(true);
+						}
+
 						return { ...point, played: true, distance };
 					}
 
@@ -233,7 +247,7 @@ export default function Home() {
 				return updatedLocations;
 			});
 		},
-		[]
+		[] // Dependencies remain empty
 	);
 
 	useEffect(() => {
@@ -365,26 +379,15 @@ export default function Home() {
 									</p>
 									<p className="text-xs mt-2 text-teal-400">
 										{point.distance === Infinity
-											? "Distance: N/A"
-											: `Distance: ${Math.round(
-													point.distance
-											  )}m`}
+											? `Distance: Not Available`
+											: `Distance: ${Math.round(point.distance)}m` }
 										{point.played && (
 											<span className="ml-2 font-bold text-green-400">
 												(Visited ✔)
 											</span>
 										)}
 									</p>
-									{point.id === 1 &&
-										point.played &&
-										!showAR && (
-											<button
-												onClick={() => setShowAR(true)}
-												className="mt-3 w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm"
-											>
-												Launch AR Experience
-											</button>
-										)}
+
 								</li>
 							))}
 						</ul>
