@@ -369,7 +369,7 @@ export default function Home() {
                   </p>
 
                   {/* Conditionally render the button to launch the AR experience */}
-                  {point.id === 1 && point.played && (
+                  {point.played && (
                     <button
                       onClick={() => setShowAR(true)}
                       className="mt-3 w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-transform transform hover:scale-105"
